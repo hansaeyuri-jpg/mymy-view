@@ -105,29 +105,32 @@
       font-weight: 700;
     }
   
-    /* 모바일 최적화 스타일 추가 */
+    /* 모바일 최적화 스타일 (수정됨) */
     @media (max-width: 768px) {
-      /* 모바일에서 화면 너비 넓게 사용 */
-      #chat-container {
-        width: 95% !important;
-        max-width: none !important; 
-        padding: 10px !important; /* 패딩 약간 줄임 */
+      /* 전체 여백 축소 */
+      body {
+        padding: 10px !important;
       }
 
-      /* 폰트 크기 전체적으로 축소 (약 2pt 정도 체감 축소) */
-      body, .message-bubble, .sender-name, #controls input, #controls button {
-        font-size: 14px !important; /* 기본보다 작게 설정 */
+      /* 채팅창 컨테이너 너비 확장 */
+      #chat {
+        width: 100% !important;
+        max-width: 100% !important;
       }
 
-      /* 메시지 내용 폰트 */
-      .message-content {
-        font-size: 14px !important;
-        line-height: 1.4;
+      /* 말풍선 최대 너비도 조금 더 넓게 허용 (기존 70% -> 85% 정도) */
+      .message {
+        max-width: 88% !important;
+        font-size: 14px !important; /* 폰트 크기 축소 */
       }
 
-      /* 발신자 이름 폰트는 더 작게 */
-      .sender-name {
-        font-size: 12px !important;
+      /* 폰트 크기 전체적으로 축소 */
+      #controls input, #controls button, .meta {
+        font-size: 13px !important; 
+      }
+
+      .meta {
+        font-size: 11px !important; /* 이름은 더 작게 */
       }
     }
 
