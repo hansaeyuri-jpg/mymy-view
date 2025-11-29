@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>JSONL 채팅 말풍선 보기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    /* 기본 레이아웃 및 디자인 */
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background:#f5f5f5;
+      padding:20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    #controls {
+      margin-bottom:16px;
+      width:100%;
+      display:flex;
+      justify-content:center;
+    }
+    
+    /* ⭐️ 2. 파일 선택 버튼 스타일링 추가 ⭐️ */
+    #fileInput {
+        font-size: 16px; /* 폰트 크기 조정 */
+        padding: 10px; /* 터치 영역 확보 */
+        max-width: 90%; /* 모바일 너비에 맞게 조정 */
+        border: 1px solid #ccc; /* 경계선 추가 */
+        border-radius: 8px;
+        background-color: #ffffff;
+        cursor: pointer;
+    }
+
+    .message {
+      max-width: 70%;
+      padding:10px 14px;
+      border-radius:16px;
+      margin:6px 0;
+      line-height:1.5;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    #chat {
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .bubble-wrapper {
+      display:flex;
+      flex-direction:column;
+      width:100%;
+      align-items:center;
+    }
+    
+    /* 사용자 메시지 (오른쪽 말풍선) 스타일 */
+    .from-user {
+      background:#e8f7ff;
+      text-align:left; 
+      align-self: flex-end;
+      margin-left: 0;
+    }
+    
+    /* 봇 메시지 (왼쪽 말풍선) 스타일 */
+    .from-bot {
+      background:#fffbe6;
+      text-align:left;
+      align-self: flex-start;
+      margin-right: 0;
+    }
+    
+    /* 이름(meta) 기본 스타일 */
+    .meta {
+      font-size:12px;
+      color:#666;
+      margin-bottom:2px;
+    }
+    
+    /* 이름 정렬 */
+    .from-user-meta {
+      align-self: flex-end; /* 사용자 이름은 오른쪽 정렬 */
+    }
+    .from-bot-meta {
+      align-self: flex-start; /* 봇 이름은 왼쪽 정렬 */
+    }
+
+    /* [스타일 1] 큰따옴표: 보라색 + 굵게 */
+    .highlight-purple {
+      color: #7c3aed;
+      font-weight: 500;
+    }
+
+    /* [스타일 2] 별표(*): 회색 + 기울임 */
+    .highlight-action {
+      color: #868e96; 
+      font-style: italic; 
+    }
+
+    /* [스타일 3] 별표 2개(**): 굵게 */
+    .highlight-bold {
+      font-weight: 700;
+    }
+  
+    /* 모바일 최적화 스타일 추가 */
+    @media (max-width: 768px) {
+      /* 모바일에서 화면 너비 넓게 사용 */
+      #chat-container {
+        width: 95% !important;
+        max-width: none !important; 
+        padding: 10px !important; /* 패딩 약간 줄임 */
+      }
+
+      /* 폰트 크기 전체적으로 축소 (약 2pt 정도 체감 축소) */
+      body, .message-bubble, .sender-name, #controls input, #controls button {
+        font-size: 14px !important; /* 기본보다 작게 설정 */
+      }
+
+      /* 메시지 내용 폰트 */
+      .message-content {
+        font-size: 14px !important;
+        line-height: 1.4;
+      }
+
+      /* 발신자 이름 폰트는 더 작게 */
+      .sender-name {
+        font-size: 12px !important;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <input type="file" id="fileInput" accept="*/*" /> 
+  </div>
+
+  <div id="chat"></div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const chat = document.getElementById('chat');
+
+    // HTML 특수문자 이스케이프
+    function escapeHtml(text) {
+      if (!text) return text;
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      
+      // 파일 읽기 실패 시 에러 처리
+      reader.onerror = (e) => {
+        chat.innerHTML = `<div style="color: red; text-align: center; margin-top: 20px;">파일을 읽는 도중 오류가 발생했습니다: ${reader.error.name}</div>`;
+      };
+      
+      reader.onload = (event) => {
+        chat.innerHTML = "";
+        const text = event.target.result;
+        
+        // 파일 내용이 비어있는지 확인
+        if (!text || text.trim() === "") {
+            chat.innerHTML = '<div style="color: red; text-align: center; margin-top: 20px;">파일 내용이 비어 있거나 읽을 수 없습니다.</div>';
+            return;
+        }
+
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+        let messageCount = 0; // 메시지 렌더링 성공 카운터
+
+        lines.forEach((line) => {
+          try {
+            const obj = JSON.parse(line);
+            
+            // mes 키가 없는 줄 (메타데이터)은 건너뜁니다.
+            if (!obj.mes) {
+                return; 
+            }
+
+            const name = obj.name || obj.user_name || "이름 없음";
+            const isUser = obj.is_user === true;
+            
+            // 1. 줄바꿈 문자 복원
+            const rawMessage = (obj.mes || "").replace(/\\n/g, "\n").replace(/\\r/g, "\r");
+
+            // 2. HTML 이스케이프
+            let safeMessage = escapeHtml(rawMessage);
+
+            // 3. 서식 적용
+            let formattedMessage = safeMessage
+              // (A) 큰따옴표 처리 (보라색)
+              .replace(
+                /([“"])([^"“”]*)([”"])/g,
+                '<span class="highlight-purple">$1$2$3</span>'
+              )
+              // (B) 별표 2개(**) 처리 (굵게)
+              .replace(
+                /\*\*([\s\S]+?)\*\*/g,
+                '<span class="highlight-bold">$1</span>'
+              )
+              // (C) 별표 1개(*) 처리 (회색 + 이탤릭)
+              .replace(
+                /\*(\S[\s\S]*?\S)\*/g,
+                '<span class="highlight-action">$1</span>' 
+              );
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bubble-wrapper';
+
+            const meta = document.createElement('div');
+            // 이름 정렬 클래스 추가
+            meta.className = 'meta ' + (isUser ? 'from-user-meta' : 'from-bot-meta'); 
+            meta.textContent = name;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message ' + (isUser ? 'from-user' : 'from-bot');
+            
+            bubble.innerHTML = formattedMessage;
+
+            wrapper.appendChild(meta);
+            wrapper.appendChild(bubble);
+            chat.appendChild(wrapper);
+            
+            messageCount++; // 성공적으로 렌더링된 메시지 수 증가
+
+          } catch (err) {
+            console.error("JSON 파싱 실패:", err, line);
+            // 모바일에서 에러 확인이 어려우므로 콘솔 에러를 남깁니다.
+          }
+        });
+        
+        // 유효 메시지가 하나도 없을 때 피드백 제공
+        if (messageCount === 0) {
+             chat.innerHTML = '<div style="color: red; text-align: center; margin-top: 20px;">파일을 읽었으나, 표시할 수 있는 유효한 채팅 메시지(JSON 객체와 "mes" 필드)를 찾을 수 없습니다.<br>파일 형식을 확인해주세요.</div>';
+        }
+      };
+      
+      // 파일을 UTF-8로 읽습니다.
+      reader.readAsText(file, "utf-8");
+    });
+  </script>
+</body>
+</html>
